@@ -1,0 +1,95 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: "8.0.x"
+  AZURE_WEBAPP_NAME: weather-microservice-app
+  AZURE_WEBAPP_PACKAGE_PATH: ./publish
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: weatherdb_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Run tests
+        run: dotnet test --no-build -c Release --verbosity normal \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./coverage
+        env:
+          ConnectionStrings__DefaultConnection: Host=localhost;Database=weatherdb_test;Username=postgres;Password=postgres
+          ConnectionStrings__Redis: localhost:6379
+          Jwt__Key: test-secret-key-for-ci-only-256bits-long
+          Jwt__Issuer: WeatherMicroservice
+          Jwt__Audience: WeatherMicroserviceClients
+          OpenWeatherMap__ApiKey: test-key
+
+      - name: Publish
+        run: dotnet publish src/WeatherMicroservice/WeatherMicroservice.csproj \
+          -c Release -o ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp
+          path: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webapp
+          path: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}

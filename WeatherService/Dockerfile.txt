@@ -1,0 +1,27 @@
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 8080
+EXPOSE 8081
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY ["src/WeatherMicroservice/WeatherMicroservice.csproj", "src/WeatherMicroservice/"]
+RUN dotnet restore "src/WeatherMicroservice/WeatherMicroservice.csproj"
+COPY . .
+WORKDIR "/src/src/WeatherMicroservice"
+RUN dotnet build -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://+:8080
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["dotnet", "WeatherMicroservice.dll"]
