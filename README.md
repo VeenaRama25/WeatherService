@@ -1,6 +1,6 @@
 # Weather Microservice
 
-A production-ready REST API built with **C# / ASP.NET Core 8** for querying current, forecast, and historical weather data, managing alert subscriptions, and exporting data as CSV. Integrates with [OpenWeatherMap](https://openweathermap.org/api) and [data.gov.sg](https://data.gov.sg/), persists to PostgreSQL with Redis caching, and ships with JWT auth, rate limiting, Swagger/OpenAPI docs, Docker support, and a GitHub Actions CI/CD pipeline that deploys to Azure.
+Weather Microservice is REST API built with **C# / ASP.NET Core 8** for querying current, forecast, and historical weather data, managing alert subscriptions, and exporting data as CSV. Integrates with [OpenWeatherMap](https://openweathermap.org/api) and [data.gov.sg](https://data.gov.sg/), persists to PostgreSQL with Redis caching, and ships with JWT auth, rate limiting, Swagger/OpenAPI docs, Docker support, and a GitHub Actions CI/CD pipeline that deploys to Azure.
 
 ---
 
